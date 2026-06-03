@@ -521,15 +521,16 @@ function scoreDeal(d) {
   let ss = 0;
   const goodMkts = ['brooklyn','manhattan','clinton hill','prospect heights','crown heights','bedford-stuyvesant','bed-stuy','fort greene','cobble hill','carroll gardens','boerum hill','park slope','harlem','washington heights','west village','east village','upper west','upper east','astoria','long island city','hoboken','jersey city','williamsburg','greenpoint','bushwick','flatbush','ditmas'];
   const loc = ((d.submarket||'') + ' ' + (d.property_name||'')).toLowerCase();
+  const compNote = compPSF ? `$${fmt(compPSF)}/SF comp basis entered` : 'no comp basis entered yet';
   if (goodMkts.some(m => loc.includes(m))) {
     ss = 7;
-    flags.push({ l:'green', t:`Submarket aligns with FM Capital target markets — $900/SF comp basis should be supportable.` });
+    flags.push({ l:'green', t:`Submarket aligns with FM Capital target markets — ${compNote}.` });
   } else if (/bronx|staten island/.test(loc)) {
     ss = 2;
-    flags.push({ l:'yellow', t:`Submarket may be outside core condo comp territory — validate $900/SF basis with local comparables.` });
+    flags.push({ l:'yellow', t:`Submarket may be outside core condo comp territory — validate comp basis with local comparables (${compNote}).` });
   } else {
     ss = 3;
-    flags.push({ l:'yellow', t:`Verify $900/SF condo comp basis for this submarket — it's the load-bearing assumption for insider pricing.` });
+    flags.push({ l:'yellow', t:`Verify condo comp basis for this submarket — it's the load-bearing assumption for insider pricing (${compNote}).` });
   }
   // Building age (5 pts)
   const as_ = d.year_built ? (d.year_built < 1940 ? 5 : d.year_built < 1970 ? 3 : 2) : 3;
