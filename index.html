@@ -618,7 +618,8 @@ function renderResults(r, d) {
       </div>
     </div>
 
-    <div class="center">
+    <div class="center" style="gap:12px">
+      <button class="btn btn-ghost" onclick="goBackToReview()">← Edit Fields</button>
       <button class="btn btn-ghost" onclick="resetApp()">+ Screen Another Deal</button>
     </div>`;
 
@@ -631,6 +632,21 @@ function renderResults(r, d) {
       options: { cutout:'72%', animation:{ duration:900, easing:'easeInOutQuart' }, plugins:{ legend:{ display:false }, tooltip:{ enabled:false } }, responsive:false }
     });
   });
+}
+
+function goBackToReview() {
+  hide('step3');
+  hide('stepLoading');
+  // Go back to whichever form has data
+  if (document.getElementById('reviewForm').innerHTML) {
+    show('step2');
+    setStep(2);
+  } else {
+    show('step1');
+    setMode('manual');
+    setStep(1);
+  }
+  document.getElementById('resetBtn').style.display = 'none';
 }
 
 // ─── Reset ────────────────────────────────────────────────────────────────────
