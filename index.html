@@ -254,7 +254,7 @@ const FIELDS = [
   { key: 'avg_rs_rent',       label: 'Avg RS Rent ($/mo)',         type: 'number', placeholder: '1400',                            required: false },
   { key: 'year_built',        label: 'Year Built',                 type: 'number', placeholder: '1920',                            required: false },
   { key: 'building_class',    label: 'Building Class / Type',      type: 'text',   placeholder: 'Pre-war walk-up',                 required: false },
-  { key: 'comp_psf',          label: 'Condo Comp Basis ($/SF)',    type: 'number', placeholder: 'Your research — e.g. 1100',       required: false },
+  { key: 'comp_psf',          label: 'Condo Comp Basis ($/SF) ★',  type: 'number', placeholder: 'Your research — e.g. 1100',       required: true  },
   { key: 'seller_notes',      label: 'Seller / Broker Notes',      type: 'text',   placeholder: 'Key context from the OM',         required: false },
 ];
 
@@ -307,13 +307,19 @@ function setMode(mode) {
 function renderForm(containerId, defaults) {
   document.getElementById(containerId).innerHTML =
     `<div class="form-grid">` +
-    FIELDS.map(f => `
-      <div class="form-group${f.key === 'seller_notes' ? ' full' : ''}">
-        <label>${f.label}${f.required ? ' *' : ''}</label>
+    FIELDS.map(f => {
+      const isComp = f.key === 'comp_psf';
+      const isFull = f.key === 'seller_notes' || isComp;
+      return `
+      <div class="form-group${isFull ? ' full' : ''}${isComp ? ' comp-highlight' : ''}">
+        <label>${f.label}</label>
+        ${isComp ? `<div style="font-size:12px;color:var(--warn);margin-bottom:6px">Pull from your own closed condo sales research for this submarket before scoring.</div>` : ''}
         <input type="${f.type}" id="f_${f.key}"
           placeholder="${f.placeholder}"
-          value="${defaults[f.key] != null ? defaults[f.key] : ''}">
-      </div>`).join('') +
+          value="${defaults[f.key] != null ? defaults[f.key] : ''}"
+          ${isComp ? 'style="border-color:var(--warn);background:var(--warn-light)"' : ''}>
+      </div>`;
+    }).join('') +
     `</div>`;
 }
 
@@ -376,6 +382,12 @@ function runScoring() {
   if (!data.property_name || !data.asking_price || !data.total_units) {
     const errId = document.getElementById('step2').style.display !== 'none' ? 'reviewError' : null;
     const msg = 'Please fill in Property Name, Asking Price, and Total Units at minimum.';
+    if (errId) showError(errId, msg); else alert(msg);
+    return;
+  }
+  if (!data.comp_psf) {
+    const errId = document.getElementById('step2').style.display !== 'none' ? 'reviewError' : null;
+    const msg = 'Please enter a Condo Comp Basis ($/SF) before scoring. Use $1 if you don\'t have comps yet.';
     if (errId) showError(errId, msg); else alert(msg);
     return;
   }
