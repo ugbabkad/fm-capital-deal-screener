@@ -254,6 +254,11 @@ const FIELDS = [
   { key: 'avg_rs_rent',       label: 'Avg RS Rent ($/mo)',         type: 'number', placeholder: '1400',                            required: false },
   { key: 'year_built',        label: 'Year Built',                 type: 'number', placeholder: '1920',                            required: false },
   { key: 'building_class',    label: 'Building Class / Type',      type: 'text',   placeholder: 'Pre-war walk-up',                 required: false },
+  { key: 'units_studio',      label: 'Studio Units',               type: 'number', placeholder: '0',                               required: false },
+  { key: 'units_1br',         label: '1-Bedroom Units',            type: 'number', placeholder: '20',                              required: false },
+  { key: 'units_2br',         label: '2-Bedroom Units',            type: 'number', placeholder: '20',                              required: false },
+  { key: 'units_3br',         label: '3-Bedroom Units',            type: 'number', placeholder: '5',                               required: false },
+  { key: 'units_4br_plus',    label: '4+ Bedroom Units',           type: 'number', placeholder: '0',                               required: false },
   { key: 'comp_psf',          label: 'Condo Comp Basis ($/SF) ★',  type: 'number', placeholder: 'Your research — e.g. 1100',       required: true  },
   { key: 'seller_notes',      label: 'Seller / Broker Notes',      type: 'text',   placeholder: 'Key context from the OM',         required: false },
 ];
@@ -567,12 +572,15 @@ function renderResults(r, d) {
         <div class="summary-cell"><div class="s-label">Asking Price</div><div class="s-value">${d.asking_price ? '$'+fmtM(d.asking_price) : 'N/A'}</div></div>
         <div class="summary-cell"><div class="s-label">Price / Door</div><div class="s-value">${ppd}</div></div>
         <div class="summary-cell"><div class="s-label">Total Units</div><div class="s-value">${d.total_units || 'N/A'}</div></div>
-        <div class="summary-cell"><div class="s-label">FM Units</div><div class="s-value sm">${d.free_market_units != null ? d.free_market_units+' ('+fmStr+')' : 'N/A'}</div></div>
+        <div class="summary-cell"><div class="s-label">FM Units</div><div class="s-value sm">${d.free_market_units != null ? d.free_market_units : 'N/A'}</div></div>
         <div class="summary-cell"><div class="s-label">RS Units</div><div class="s-value sm">${d.rent_stab_units != null ? d.rent_stab_units : 'N/A'}</div></div>
+        <div class="summary-cell"><div class="s-label">FM / RS Ratio</div><div class="s-value sm">${fmStr !== 'N/A' ? fmStr+' FM / '+(100-Math.round(r.fmPct*100))+'% RS' : 'N/A'}</div></div>
         <div class="summary-cell"><div class="s-label">Avg Unit SF</div><div class="s-value sm">${d.avg_sf ? d.avg_sf+' SF' : 'N/A'}</div></div>
         <div class="summary-cell"><div class="s-label">Avg Rent</div><div class="s-value sm">${d.avg_rent ? '$'+fmt(d.avg_rent)+'/mo' : 'N/A'}</div></div>
         <div class="summary-cell"><div class="s-label">Market Rent</div><div class="s-value sm">${d.avg_market_rent ? '$'+fmt(d.avg_market_rent)+'/mo' : 'N/A'}</div></div>
-        <div class="summary-cell"><div class="s-label">Implied Condo Value</div><div class="s-value sm">${impliedVal}${(compPSF && d.avg_sf) ? '/unit' : ''}</div><div style="font-size:10px;color:var(--muted);margin-top:3px">${(compPSF && d.avg_sf) ? 'at $'+fmt(compPSF)+'/SF comp' : 'Enter comp $/SF to calculate'}</div></div>
+        <div class="summary-cell"><div class="s-label">Implied Value / Unit</div><div class="s-value sm">${impliedVal}${(compPSF && d.avg_sf) ? '' : ''}</div><div style="font-size:10px;color:var(--muted);margin-top:3px">${(compPSF && d.avg_sf) ? 'at $'+fmt(compPSF)+'/SF' : '—'}</div></div>
+        <div class="summary-cell"><div class="s-label">Implied Total Value</div><div class="s-value sm">${(compPSF && d.avg_sf && d.total_units) ? '$'+fmtM(d.avg_sf * compPSF * d.total_units) : 'N/A'}</div><div style="font-size:10px;color:var(--muted);margin-top:3px">${(compPSF && d.avg_sf && d.total_units) ? 'at $'+fmt(compPSF)+'/SF' : '—'}</div></div>
+        <div class="summary-cell"><div class="s-label">Bedroom Mix</div><div class="s-value sm" style="font-size:12px;line-height:1.6">${bedroomMix(d)}</div></div>
       </div>
       ${d.seller_notes ? `<div class="notes-box"><strong>OM Notes:</strong> ${d.seller_notes}</div>` : ''}
     </div>
@@ -655,6 +663,18 @@ function setStep(n) {
 }
 function fmt(n) { return n == null ? 'N/A' : Math.round(n).toLocaleString(); }
 function fmtM(n) { return n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(0)+'K' : String(n); }
+function bedroomMix(d) {
+  const rows = [
+    { label: 'Studio', val: d.units_studio },
+    { label: '1 BR',   val: d.units_1br },
+    { label: '2 BR',   val: d.units_2br },
+    { label: '3 BR',   val: d.units_3br },
+    { label: '4+ BR',  val: d.units_4br_plus },
+  ].filter(r => r.val != null && r.val > 0);
+  if (!rows.length) return 'N/A';
+  const total = rows.reduce((s, r) => s + r.val, 0);
+  return rows.map(r => `${r.label}: ${r.val} (${Math.round(r.val/total*100)}%)`).join('<br>');
+}
 </script>
 </body>
 </html>

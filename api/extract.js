@@ -24,6 +24,11 @@ Return exactly these keys:
   "avg_rs_rent": number (average rent-stabilized tenant rent per month — null if not found),
   "year_built": number (null if not found),
   "building_class": "brief description e.g. pre-war walk-up, elevator building",
+  "units_studio": number (studio/alcove studio units — null if not found),
+  "units_1br": number (1-bedroom units — null if not found),
+  "units_2br": number (2-bedroom units — null if not found),
+  "units_3br": number (3-bedroom units — null if not found),
+  "units_4br_plus": number (4+ bedroom units — null if not found),
   "seller_notes": "key notes from the OM: seller motivation, property condition, recent renovations, debt situation, anything relevant"
 }
 
