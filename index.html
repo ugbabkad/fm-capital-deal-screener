@@ -419,21 +419,26 @@ function scoreDeal(d) {
   // 1. Price per door (25 pts) — scored relative to comp basis, not fixed threshold
   const ppd = (d.asking_price && d.total_units) ? d.asking_price / d.total_units : null;
   let s = 0;
-  if (ppd !== null) {
-    if      (ppd <= 200000) s = 25;
-    else if (ppd <= 250000) s = 20;
-    else if (ppd <= 300000) s = 13;
-    else if (ppd <= 350000) s = 6;
-    else if (ppd <= 400000) s = 2;
+  if (ppd !== null && impliedPerDoor) {
+    const ratio = ppd / impliedPerDoor;
+    const pct = Math.round(ratio * 100);
+    if      (ratio <= 0.30) s = 25;
+    else if (ratio <= 0.40) s = 20;
+    else if (ratio <= 0.50) s = 13;
+    else if (ratio <= 0.60) s = 6;
+    else if (ratio <= 0.70) s = 2;
     else                    s = 0;
 
-    if      (ppd > 350000) flags.push({ l:'red',    t:`Price/door is $${fmt(ppd)} — above $350K. Thesis likely breaks at this entry.` });
-    else if (ppd > 280000) flags.push({ l:'yellow', t:`Price/door is $${fmt(ppd)} — above the $255K benchmark from 420 Clinton. Stress-test the numbers.` });
-    else                   flags.push({ l:'green',  t:`Price/door at $${fmt(ppd)} is attractive relative to the $255K/door benchmark.` });
+    if      (ratio > 0.60) flags.push({ l:'red',    t:`Buying at ${pct}% of implied condo value ($${fmt(ppd)} / $${fmt(impliedPerDoor)}) — thin arbitrage for the conversion thesis.` });
+    else if (ratio > 0.45) flags.push({ l:'yellow', t:`Buying at ${pct}% of implied condo value ($${fmt(ppd)} / $${fmt(impliedPerDoor)}) — workable but stress-test insider pricing and carry costs.` });
+    else                   flags.push({ l:'green',  t:`Buying at ${pct}% of implied condo value ($${fmt(ppd)} / $${fmt(impliedPerDoor)}) — strong arbitrage for the conversion thesis.` });
+  } else if (ppd !== null) {
+    s = 0;
+    flags.push({ l:'yellow', t:`Price/door is $${fmt(ppd)}. Enter condo comp $/SF to score the entry ratio.` });
   } else {
     flags.push({ l:'yellow', t:'Cannot determine price/door — verify asking price and unit count.' });
   }
-  scores.ppd = { score: s, max: 25, label: 'Price / Door', detail: ppd ? '$' + fmt(ppd) + '/door' : 'N/A' };
+  scores.ppd = { score: s, max: 25, label: 'Entry Ratio', detail: (ppd && impliedPerDoor) ? Math.round(ppd/impliedPerDoor*100)+'% of implied value' : ppd ? '$'+fmt(ppd)+'/door' : 'N/A' };
   total += s; s = 0;
 
   // 2. FM / RS mix (20 pts)
