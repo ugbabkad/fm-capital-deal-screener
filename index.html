@@ -388,24 +388,74 @@ function runScoring() {
   }, 700);
 }
 
+// ─── Submarket Comp Basis ─────────────────────────────────────────────────────
+// $/SF condo comp basis by submarket — used for implied value and scoring
+const COMP_BASIS = [
+  // Manhattan premium
+  { keywords: ['tribeca','soho','west village','hudson square'],          psf: 2200 },
+  { keywords: ['east village','lower east side','les','noho','nolita'],   psf: 1800 },
+  { keywords: ['chelsea','gramercy','flatiron','union square','murray hill'], psf: 1600 },
+  { keywords: ['upper west side','uws','upper east side','ues','yorkville'], psf: 1500 },
+  { keywords: ['harlem','morningside heights'],                            psf: 1100 },
+  { keywords: ['washington heights','inwood','hamilton heights'],          psf: 900  },
+  // Brooklyn
+  { keywords: ['brooklyn heights','cobble hill','carroll gardens','boerum hill'], psf: 1200 },
+  { keywords: ['park slope','prospect heights','gowanus'],                 psf: 1100 },
+  { keywords: ['clinton hill','fort greene','prospect lefferts'],          psf: 950  },
+  { keywords: ['williamsburg','greenpoint'],                               psf: 1200 },
+  { keywords: ['crown heights','bedford','bed-stuy','bedford-stuyvesant'], psf: 850  },
+  { keywords: ['bushwick','east new york','flatbush','ditmas'],            psf: 750  },
+  // Queens / other
+  { keywords: ['long island city','lic','astoria'],                        psf: 950  },
+  { keywords: ['hoboken','jersey city'],                                   psf: 800  },
+];
+
+function getCompBasis(submarket, propertyName) {
+  const loc = ((submarket || '') + ' ' + (propertyName || '')).toLowerCase();
+  for (const entry of COMP_BASIS) {
+    if (entry.keywords.some(k => loc.includes(k))) return entry.psf;
+  }
+  // Default: generic NYC
+  if (/manhattan|new york, ny|new york city/.test(loc)) return 1400;
+  if (/brooklyn/.test(loc)) return 950;
+  if (/queens/.test(loc)) return 900;
+  return 900; // fallback
+}
+
 // ─── Scoring Engine ───────────────────────────────────────────────────────────
 function scoreDeal(d) {
   const scores = {}, flags = [];
   let total = 0;
 
-  // 1. Price per door (25 pts)
+  // Determine submarket comp basis
+  const compPSF = getCompBasis(d.submarket, d.property_name);
+  const impliedPerDoor = d.avg_sf ? d.avg_sf * compPSF : null;
+
+  // 1. Price per door (25 pts) — scored relative to comp basis, not fixed threshold
   const ppd = (d.asking_price && d.total_units) ? d.asking_price / d.total_units : null;
   let s = 0;
-  if (ppd !== null) {
+  if (ppd !== null && impliedPerDoor) {
+    // Score based on entry price as % of implied condo value
+    const entryRatio = ppd / impliedPerDoor;
+    if      (entryRatio <= 0.28) s = 25;
+    else if (entryRatio <= 0.35) s = 20;
+    else if (entryRatio <= 0.45) s = 13;
+    else if (entryRatio <= 0.55) s = 6;
+    else if (entryRatio <= 0.65) s = 2;
+    else                         s = 0;
+
+    const pct = Math.round(entryRatio * 100);
+    if      (entryRatio > 0.55) flags.push({ l:'red',    t:`Price/door ($${fmt(ppd)}) is ${pct}% of implied condo value ($${fmt(impliedPerDoor)}) at $${fmt(compPSF)}/SF comp basis — thin margin for the conversion thesis.` });
+    else if (entryRatio > 0.40) flags.push({ l:'yellow', t:`Price/door ($${fmt(ppd)}) is ${pct}% of implied condo value ($${fmt(impliedPerDoor)}) — workable but stress-test insider pricing.` });
+    else                        flags.push({ l:'green',  t:`Price/door ($${fmt(ppd)}) is ${pct}% of implied condo value ($${fmt(impliedPerDoor)}) at $${fmt(compPSF)}/SF — strong entry for the conversion thesis.` });
+  } else if (ppd !== null) {
+    // Fallback to absolute thresholds if no SF data
     if      (ppd <= 200000) s = 25;
     else if (ppd <= 250000) s = 20;
     else if (ppd <= 300000) s = 13;
     else if (ppd <= 350000) s = 6;
     else if (ppd <= 400000) s = 2;
-
-    if      (ppd > 350000) flags.push({ l:'red',    t:`Price/door is $${fmt(ppd)} — above $350K basis. Thesis likely breaks unless comp basis is materially higher than $900/SF.` });
-    else if (ppd > 280000) flags.push({ l:'yellow', t:`Price/door is $${fmt(ppd)} — slightly above 420 Clinton's $255K benchmark. Stress-test insider pricing.` });
-    else                   flags.push({ l:'green',  t:`Price/door at $${fmt(ppd)} is attractive — solid entry vs. the $255K/door benchmark.` });
+    flags.push({ l:'yellow', t:`Price/door is $${fmt(ppd)}. No unit SF data to compare against comp basis — get the rent roll to validate.` });
   } else {
     flags.push({ l:'yellow', t:'Cannot determine price/door — verify asking price and unit count.' });
   }
@@ -466,10 +516,10 @@ function scoreDeal(d) {
     else if (d.avg_sf >= 700)  s = 6;
     else                       s = 2;
 
-    const iv = '$' + fmt(d.avg_sf * 900);
-    if      (d.avg_sf >= 950) flags.push({ l:'green',  t:`Avg ${d.avg_sf} SF/unit implies ~${iv} market value at $900/SF — good insider discount headroom.` });
-    else if (d.avg_sf < 700)  flags.push({ l:'red',    t:`Small units avg ${d.avg_sf} SF. Condo pricing per SF works less well under 700 SF — validate comp basis.` });
-    else                      flags.push({ l:'yellow', t:`Avg ${d.avg_sf} SF/unit — confirm $900/SF comp support at this size.` });
+    const iv = '$' + fmt(d.avg_sf * compPSF);
+    if      (d.avg_sf >= 950) flags.push({ l:'green',  t:`Avg ${d.avg_sf} SF/unit implies ~${iv} market value at $${fmt(compPSF)}/SF comp basis — good insider discount headroom.` });
+    else if (d.avg_sf < 700)  flags.push({ l:'red',    t:`Small units avg ${d.avg_sf} SF. Condo pricing per SF works less well under 700 SF — validate comp basis carefully.` });
+    else                      flags.push({ l:'yellow', t:`Avg ${d.avg_sf} SF/unit implies ~${iv} at $${fmt(compPSF)}/SF comp basis — confirm support at this size.` });
   } else {
     flags.push({ l:'yellow', t:'No avg unit SF in OM. Get the rent roll — unit size directly drives your $/SF comp analysis.' });
     s = 4;
@@ -522,7 +572,8 @@ function renderResults(r, d) {
   const ringBg = r.total >= 68 ? '#dcfce7' : r.total >= 45 ? '#fef3c7' : '#fee2e2';
   const ppd = r.ppd ? '$' + fmt(r.ppd) : 'N/A';
   const fmStr = r.fmPct != null ? Math.round(r.fmPct*100)+'%' : 'N/A';
-  const impliedVal = d.avg_sf ? '$' + fmt(d.avg_sf * 900) : 'N/A';
+  const compPSF = getCompBasis(d.submarket, d.property_name);
+  const impliedVal = d.avg_sf ? '$' + fmt(d.avg_sf * compPSF) : 'N/A';
 
   document.getElementById('step3').innerHTML = `
     <div class="card">
@@ -551,7 +602,7 @@ function renderResults(r, d) {
         <div class="summary-cell"><div class="s-label">Avg Unit SF</div><div class="s-value sm">${d.avg_sf ? d.avg_sf+' SF' : 'N/A'}</div></div>
         <div class="summary-cell"><div class="s-label">Avg Rent</div><div class="s-value sm">${d.avg_rent ? '$'+fmt(d.avg_rent)+'/mo' : 'N/A'}</div></div>
         <div class="summary-cell"><div class="s-label">Market Rent</div><div class="s-value sm">${d.avg_market_rent ? '$'+fmt(d.avg_market_rent)+'/mo' : 'N/A'}</div></div>
-        <div class="summary-cell"><div class="s-label">Implied Condo Value</div><div class="s-value sm">${impliedVal}${d.avg_sf ? '/unit' : ''}</div></div>
+        <div class="summary-cell"><div class="s-label">Implied Condo Value</div><div class="s-value sm">${impliedVal}${d.avg_sf ? '/unit' : ''}</div><div style="font-size:10px;color:var(--muted);margin-top:3px">${d.avg_sf ? 'at $'+fmt(compPSF)+'/SF comp' : ''}</div></div>
       </div>
       ${d.seller_notes ? `<div class="notes-box"><strong>OM Notes:</strong> ${d.seller_notes}</div>` : ''}
     </div>
