@@ -265,6 +265,8 @@ const FIELDS = [
 
 // ─── State ─────────────────────────────────────────────────────────────────
 let pdfFile = null;
+let lastDeal = null;   // { data, results } — saved when scoring runs
+let lastScored = null;
 
 // ─── Drop zone ──────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -402,7 +404,9 @@ function runScoring() {
   setTimeout(() => {
     hide('stepLoading');
     show('step3');
-    renderResults(scoreDeal(data), data);
+    const results = scoreDeal(data);
+    lastDeal = { data, results };
+    renderResults(results, data);
   }, 700);
 }
 
@@ -620,9 +624,14 @@ function renderResults(r, d) {
     </div>
 
     <div class="center" style="gap:12px">
+      <button class="btn btn-primary" id="shareBtn" onclick="shareWithTeam()">
+        <span id="shareBtnText">✉ Share with Team</span>
+        <div class="spinner" id="shareSpinner" style="display:none"></div>
+      </button>
       <button class="btn btn-ghost" onclick="goBackToReview()">← Edit Fields</button>
       <button class="btn btn-ghost" onclick="resetApp()">+ Screen Another Deal</button>
-    </div>`;
+    </div>
+    <div id="shareMsg" style="display:none;text-align:center;margin-top:12px;font-size:13px"></div>`;
 
   requestAnimationFrame(() => {
     const canvas = document.getElementById('scoreRing');
@@ -633,6 +642,45 @@ function renderResults(r, d) {
       options: { cutout:'72%', animation:{ duration:900, easing:'easeInOutQuart' }, plugins:{ legend:{ display:false }, tooltip:{ enabled:false } }, responsive:false }
     });
   });
+}
+
+async function shareWithTeam() {
+  if (!lastDeal) return;
+  const btn = document.getElementById('shareBtn');
+  const msg = document.getElementById('shareMsg');
+  btn.disabled = true;
+  document.getElementById('shareBtnText').textContent = 'Sending…';
+  document.getElementById('shareSpinner').style.display = 'inline-block';
+  msg.style.display = 'none';
+
+  try {
+    const fd = new FormData();
+    if (pdfFile) fd.append('pdf', pdfFile);
+    fd.append('deal', JSON.stringify(lastDeal.data));
+    fd.append('results', JSON.stringify({
+      total: lastDeal.results.total,
+      verdict: lastDeal.results.verdict,
+      scores: lastDeal.results.scores,
+      flags: lastDeal.results.flags,
+    }));
+
+    const res = await fetch('/api/send-email', { method: 'POST', body: fd });
+    const json = await res.json();
+    if (!res.ok || !json.ok) throw new Error(json.error || 'Send failed');
+
+    document.getElementById('shareBtnText').textContent = '✓ Sent';
+    document.getElementById('shareSpinner').style.display = 'none';
+    msg.style.display = 'block';
+    msg.style.color = 'var(--pass)';
+    msg.textContent = 'Email sent to the team.';
+  } catch (err) {
+    document.getElementById('shareBtnText').textContent = '✉ Share with Team';
+    document.getElementById('shareSpinner').style.display = 'none';
+    btn.disabled = false;
+    msg.style.display = 'block';
+    msg.style.color = 'var(--danger)';
+    msg.textContent = 'Failed to send: ' + err.message;
+  }
 }
 
 function goBackToReview() {
