@@ -402,24 +402,17 @@ function scoreDeal(d) {
   // 1. Price per door (25 pts) — scored relative to comp basis, not fixed threshold
   const ppd = (d.asking_price && d.total_units) ? d.asking_price / d.total_units : null;
   let s = 0;
-  if (ppd !== null && impliedPerDoor) {
-    // Score based on entry price as % of implied condo value
-    const entryRatio = ppd / impliedPerDoor;
-    if      (entryRatio <= 0.28) s = 25;
-    else if (entryRatio <= 0.35) s = 20;
-    else if (entryRatio <= 0.45) s = 13;
-    else if (entryRatio <= 0.55) s = 6;
-    else if (entryRatio <= 0.65) s = 2;
-    else                         s = 0;
+  if (ppd !== null) {
+    if      (ppd <= 200000) s = 25;
+    else if (ppd <= 250000) s = 20;
+    else if (ppd <= 300000) s = 13;
+    else if (ppd <= 350000) s = 6;
+    else if (ppd <= 400000) s = 2;
+    else                    s = 0;
 
-    const pct = Math.round(entryRatio * 100);
-    if      (entryRatio > 0.55) flags.push({ l:'red',    t:`Price/door ($${fmt(ppd)}) is ${pct}% of implied condo value ($${fmt(impliedPerDoor)}) at $${fmt(compPSF)}/SF comp basis — thin margin for the conversion thesis.` });
-    else if (entryRatio > 0.40) flags.push({ l:'yellow', t:`Price/door ($${fmt(ppd)}) is ${pct}% of implied condo value ($${fmt(impliedPerDoor)}) — workable but stress-test insider pricing.` });
-    else                        flags.push({ l:'green',  t:`Price/door ($${fmt(ppd)}) is ${pct}% of implied condo value ($${fmt(impliedPerDoor)}) at $${fmt(compPSF)}/SF — strong entry for the conversion thesis.` });
-  } else if (ppd !== null && !impliedPerDoor) {
-    // No comp basis or no SF — can't score relative to implied value
-    s = 0;
-    flags.push({ l:'yellow', t:`Price/door is $${fmt(ppd)}. Enter your condo comp basis ($/SF) on the review screen to score this properly.` });
+    if      (ppd > 350000) flags.push({ l:'red',    t:`Price/door is $${fmt(ppd)} — above $350K. Thesis likely breaks at this entry.` });
+    else if (ppd > 280000) flags.push({ l:'yellow', t:`Price/door is $${fmt(ppd)} — above the $255K benchmark from 420 Clinton. Stress-test the numbers.` });
+    else                   flags.push({ l:'green',  t:`Price/door at $${fmt(ppd)} is attractive relative to the $255K/door benchmark.` });
   } else {
     flags.push({ l:'yellow', t:'Cannot determine price/door — verify asking price and unit count.' });
   }
