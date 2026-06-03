@@ -438,7 +438,8 @@ function scoreDeal(d) {
   } else {
     flags.push({ l:'yellow', t:'Cannot determine price/door — verify asking price and unit count.' });
   }
-  scores.ppd = { score: s, max: 25, label: 'Entry Ratio', detail: (ppd && impliedPerDoor) ? Math.round(ppd/impliedPerDoor*100)+'% of implied value' : ppd ? '$'+fmt(ppd)+'/door' : 'N/A' };
+  const discountPct = (ppd && impliedPerDoor) ? Math.round((1 - ppd/impliedPerDoor)*100) : null;
+  scores.ppd = { score: s, max: 25, label: 'Entry Discount', detail: discountPct != null ? discountPct+'% below implied value' : ppd ? '$'+fmt(ppd)+'/door' : 'N/A' };
   total += s; s = 0;
 
   // 2. FM / RS mix (20 pts)
