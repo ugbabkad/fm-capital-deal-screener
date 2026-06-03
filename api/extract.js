@@ -1,4 +1,12 @@
-export const config = { runtime: 'edge' };
+import { IncomingForm } from 'formidable';
+import fs from 'fs';
+
+export const config = {
+  api: {
+    bodyParser: false,
+    responseLimit: false,
+  }
+};
 
 const SYSTEM_PROMPT = `You are underwriting a NYC multifamily acquisition for FM Capital, a real estate fund focused on condo conversion deals. Extract key deal metrics from this Offering Memorandum and return ONLY a valid JSON object — no markdown, no commentary, just the JSON.
 
@@ -21,33 +29,38 @@ Return exactly these keys:
 
 If a value is not stated anywhere in the document, use null. Do not guess or estimate — only extract what is explicitly written.`;
 
-export default async function handler(req) {
+function parseForm(req) {
+  return new Promise((resolve, reject) => {
+    const form = new IncomingForm({ maxFileSize: 50 * 1024 * 1024 }); // 50MB limit
+    form.parse(req, (err, fields, files) => {
+      if (err) reject(err);
+      else resolve({ fields, files });
+    });
+  });
+}
+
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
   }
 
   try {
-    const formData = await req.formData();
-    const file = formData.get('pdf');
+    const { files } = await parseForm(req);
+    const pdfFile = files.pdf?.[0] || files.pdf;
 
-    if (!file) {
-      return new Response(JSON.stringify({ error: 'No PDF file provided' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    if (!pdfFile) {
+      return res.status(400).json({ error: 'No PDF file provided' });
     }
 
-    // Convert PDF to base64
-    const arrayBuffer = await file.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    // Read file and convert to base64
+    const filepath = pdfFile.filepath || pdfFile.path;
+    const buffer = fs.readFileSync(filepath);
+    const base64 = buffer.toString('base64');
 
     // Call Anthropic API with PDF as a native document
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -84,10 +97,7 @@ export default async function handler(req) {
 
     if (!response.ok) {
       const err = await response.text();
-      return new Response(JSON.stringify({ error: `Anthropic API error: ${response.status}`, detail: err }), {
-        status: 502,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return res.status(502).json({ error: `Anthropic API error: ${response.status}`, detail: err });
     }
 
     const result = await response.json();
@@ -98,15 +108,9 @@ export default async function handler(req) {
     const jsonStr = match ? match[1] : text;
     const extracted = JSON.parse(jsonStr);
 
-    return new Response(JSON.stringify({ ok: true, data: extracted }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return res.status(200).json({ ok: true, data: extracted });
 
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return res.status(500).json({ error: err.message });
   }
 }
