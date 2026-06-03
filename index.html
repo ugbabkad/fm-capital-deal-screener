@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FM Capital — Deal Screener</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f8f7f4;
+    --card: #ffffff;
+    --border: #e5e2dc;
+    --text: #1a1916;
+    --muted: #6b6760;
+    --accent: #2c5f2e;
+    --accent-light: #e8f0e8;
+    --warn: #b45309;
+    --warn-light: #fef3c7;
+    --danger: #991b1b;
+    --danger-light: #fee2e2;
+    --pass: #166534;
+    --pass-light: #dcfce7;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .app { max-width: 860px; margin: 0 auto; padding: 32px 20px 80px; }
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 36px; }
+  .logo { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+  .title { font-size: 24px; font-weight: 800; color: var(--text); }
+  .subtitle { font-size: 14px; color: var(--muted); margin-top: 3px; }
+
+  /* Steps */
+  .steps { display: flex; align-items: center; gap: 8px; margin-bottom: 28px; }
+  .step { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  .step.active { color: var(--text); }
+  .step.done { color: var(--accent); }
+  .step-num { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; border: 2px solid currentColor; flex-shrink: 0; }
+  .step.done .step-num { background: var(--accent); color: white; border-color: var(--accent); font-size: 13px; }
+  .step-line { flex: 1; height: 1px; background: var(--border); max-width: 48px; }
+
+  /* Card */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; box-shadow: var(--shadow); margin-bottom: 16px; }
+  .card-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .card-sub { font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+
+  /* Drop zone */
+  .drop-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 48px 24px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--bg); position: relative; }
+  .drop-zone:hover { border-color: var(--accent); background: var(--accent-light); }
+  .drop-zone.dragover { border-color: var(--accent); background: var(--accent-light); transform: scale(1.005); }
+  .drop-zone.has-file { border-style: solid; border-color: var(--accent); background: var(--accent-light); }
+  .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .drop-icon { font-size: 40px; margin-bottom: 12px; line-height: 1; }
+  .drop-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 5px; }
+  .drop-sub { font-size: 13px; color: var(--muted); }
+  .file-name { font-size: 14px; font-weight: 600; color: var(--accent); margin-top: 8px; }
+
+  /* Mode toggle */
+  .mode-toggle { display: flex; background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 3px; gap: 3px; margin-bottom: 20px; }
+  .mode-btn { flex: 1; padding: 8px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; background: transparent; color: var(--muted); transition: all 0.15s; }
+  .mode-btn.active { background: white; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; transition: all 0.15s; letter-spacing: 0.01em; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover:not(:disabled) { background: #1e4220; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1.5px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 7px 14px; font-size: 13px; }
+  .btn-row { display: flex; gap: 10px; align-items: center; margin-top: 20px; flex-wrap: wrap; }
+
+  /* Form */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  input[type="text"], input[type="number"] { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--bg); color: var(--text); font-family: inherit; transition: border-color 0.15s; }
+  input:focus { outline: none; border-color: var(--accent); background: white; }
+  .ai-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: var(--accent); background: var(--accent-light); padding: 2px 8px; border-radius: 4px; margin-left: 8px; }
+
+  /* Spinner */
+  .spinner { width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
+  .spinner-dark { border-color: rgba(0,0,0,0.12); border-top-color: var(--accent); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 24px; gap: 16px; }
+  .loading-state .spinner-dark { width: 32px; height: 32px; border-width: 3px; }
+  .loading-state p { font-size: 15px; color: var(--muted); }
+
+  /* Error */
+  .error-msg { color: var(--danger); font-size: 13px; background: var(--danger-light); padding: 11px 14px; border-radius: 8px; margin-top: 12px; line-height: 1.4; border: 1px solid #fca5a5; }
+
+  /* Results */
+  .score-hero { display: flex; flex-direction: column; align-items: center; padding: 36px 24px 28px; text-align: center; }
+  .score-ring-wrap { position: relative; width: 150px; height: 150px; margin-bottom: 22px; }
+  .score-ring-wrap canvas { position: absolute; top: 0; left: 0; }
+  .score-inner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .score-num { font-size: 48px; font-weight: 900; line-height: 1; }
+  .score-denom { font-size: 14px; color: var(--muted); font-weight: 600; }
+  .verdict-badge { display: inline-flex; align-items: center; gap: 8px; padding: 10px 24px; border-radius: 10px; font-size: 17px; font-weight: 800; letter-spacing: 0.04em; }
+  .verdict-badge.pursue { background: var(--pass-light); color: var(--pass); }
+  .verdict-badge.conditional { background: var(--warn-light); color: var(--warn); }
+  .verdict-badge.pass { background: var(--danger-light); color: var(--danger); }
+  .verdict-label { font-size: 13px; color: var(--muted); margin-top: 10px; }
+
+  /* Summary grid */
+  .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+  .summary-cell { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 13px 15px; }
+  .summary-cell .s-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
+  .summary-cell .s-value { font-size: 18px; font-weight: 800; }
+  .summary-cell .s-value.sm { font-size: 14px; font-weight: 700; }
+
+  /* Score breakdown */
+  .breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .breakdown-item { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .breakdown-item .cat { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 7px; }
+  .breakdown-item .pts { font-size: 24px; font-weight: 900; line-height: 1; }
+  .breakdown-item .pts span { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .breakdown-item .detail { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .progress-bar { height: 5px; background: var(--border); border-radius: 3px; margin-top: 10px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+  .fill-green { background: var(--accent); }
+  .fill-yellow { background: #d97706; }
+  .fill-red { background: #dc2626; }
+
+  /* Flags */
+  .flags-list { display: flex; flex-direction: column; gap: 8px; }
+  .flag { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 8px; font-size: 13px; line-height: 1.45; }
+  .flag.red { background: var(--danger-light); color: #7f1d1d; border: 1px solid #fca5a5; }
+  .flag.yellow { background: var(--warn-light); color: #78350f; border: 1px solid #fcd34d; }
+  .flag.green { background: var(--pass-light); color: #14532d; border: 1px solid #86efac; }
+  .flag-icon { flex-shrink: 0; font-size: 14px; margin-top: 1px; }
+
+  /* Section label */
+  .section-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px; }
+
+  /* Notes box */
+  .notes-box { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 13px 15px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .notes-box strong { color: var(--text); }
+
+  .center { display: flex; justify-content: center; margin-top: 12px; }
+
+  @media (max-width: 580px) {
+    .form-grid, .breakdown, .summary-grid { grid-template-columns: 1fr; }
+    .app { padding: 20px 14px 60px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <div>
+      <div class="logo">FM Capital</div>
+      <div class="title">Acquisition Screener</div>
+      <div class="subtitle">Condo conversion thesis — back-of-envelope deal scoring</div>
+    </div>
+    <button class="btn btn-ghost btn-sm" id="resetBtn" style="display:none" onclick="resetApp()">+ New Deal</button>
+  </div>
+
+  <div class="steps" id="stepsBar">
+    <div class="step active" id="s1"><div class="step-num">1</div><span>Upload</span></div>
+    <div class="step-line"></div>
+    <div class="step" id="s2"><div class="step-num">2</div><span>Review</span></div>
+    <div class="step-line"></div>
+    <div class="step" id="s3"><div class="step-num">3</div><span>Results</span></div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div id="step1">
+    <div class="card">
+      <div class="card-title">Add a Deal</div>
+      <div class="card-sub">Upload the offering memo as a PDF. Claude will read it and extract the key numbers for you to review before scoring.</div>
+
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="modeAI" onclick="setMode('ai')">📄 Upload PDF</button>
+        <button class="mode-btn" id="modeManual" onclick="setMode('manual')">✏️ Manual Entry</button>
+      </div>
+
+      <!-- PDF upload -->
+      <div id="aiMode">
+        <div class="drop-zone" id="dropZone">
+          <input type="file" id="pdfInput" accept=".pdf" onchange="handleFileSelect(event)">
+          <div class="drop-icon" id="dropIcon">📄</div>
+          <div class="drop-title" id="dropTitle">Drop the OM here, or click to browse</div>
+          <div class="drop-sub" id="dropSub">PDF files only</div>
+          <div class="file-name" id="fileName" style="display:none"></div>
+        </div>
+        <div id="aiError" class="error-msg" style="display:none"></div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="extractBtn" onclick="extractWithAI()" disabled>
+            <span id="extractBtnText">Analyze with AI</span>
+            <div class="spinner" id="extractSpinner" style="display:none"></div>
+          </button>
+          <span style="font-size:13px;color:var(--muted)">or</span>
+          <button class="btn btn-ghost" onclick="setMode('manual')">Enter manually →</button>
+        </div>
+      </div>
+
+      <!-- Manual entry -->
+      <div id="manualMode" style="display:none">
+        <div id="manualForm"></div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="runScoring()">Score Deal →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: Review -->
+  <div id="step2" style="display:none">
+    <div class="card">
+      <div class="card-title">Review Extracted Fields <span class="ai-badge">✦ AI Extracted</span></div>
+      <div class="card-sub">Check the numbers below — edit anything that looks off before scoring.</div>
+      <div id="reviewForm"></div>
+      <div id="reviewError" class="error-msg" style="display:none"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runScoring()">Score Deal →</button>
+        <button class="btn btn-ghost" onclick="goToStep1()">← Back</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="stepLoading" style="display:none">
+    <div class="card">
+      <div class="loading-state">
+        <div class="spinner spinner-dark"></div>
+        <p>Scoring against FM Capital thesis…</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3: Results -->
+  <div id="step3" style="display:none"></div>
+
+</div>
+
+<script>
+// ─── Constants ─────────────────────────────────────────────────────────────
+const FIELDS = [
+  { key: 'property_name',     label: 'Property Name / Address',   type: 'text',   placeholder: '123 Main St, Brooklyn NY 11238', required: true  },
+  { key: 'submarket',         label: 'Submarket / Neighborhood',  type: 'text',   placeholder: 'Clinton Hill, Brooklyn',          required: false },
+  { key: 'asking_price',      label: 'Asking Price ($)',           type: 'number', placeholder: '12500000',                        required: true  },
+  { key: 'total_units',       label: 'Total Units',                type: 'number', placeholder: '49',                              required: true  },
+  { key: 'free_market_units', label: 'Free Market Units',          type: 'number', placeholder: '20',                              required: false },
+  { key: 'rent_stab_units',   label: 'Rent Stabilized Units',      type: 'number', placeholder: '27',                              required: false },
+  { key: 'avg_sf',            label: 'Avg Unit Size (SF)',          type: 'number', placeholder: '1093',                            required: false },
+  { key: 'avg_rent',          label: 'Avg Current Rent ($/mo)',    type: 'number', placeholder: '2700',                            required: false },
+  { key: 'avg_market_rent',   label: 'Avg Market Rent ($/mo)',     type: 'number', placeholder: '3500',                            required: false },
+  { key: 'avg_rs_rent',       label: 'Avg RS Rent ($/mo)',         type: 'number', placeholder: '1400',                            required: false },
+  { key: 'year_built',        label: 'Year Built',                 type: 'number', placeholder: '1920',                            required: false },
+  { key: 'building_class',    label: 'Building Class / Type',      type: 'text',   placeholder: 'Pre-war walk-up',                 required: false },
+  { key: 'seller_notes',      label: 'Seller / Broker Notes',      type: 'text',   placeholder: 'Key context from the OM',         required: false },
+];
+
+// ─── State ─────────────────────────────────────────────────────────────────
+let pdfFile = null;
+
+// ─── Drop zone ──────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const zone = document.getElementById('dropZone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file?.type === 'application/pdf') setFile(file);
+    else showError('aiError', 'Please upload a PDF file.');
+  });
+});
+
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (file) setFile(file);
+}
+
+function setFile(file) {
+  pdfFile = file;
+  hideError('aiError');
+  document.getElementById('dropIcon').textContent = '✅';
+  document.getElementById('dropTitle').textContent = 'File ready';
+  document.getElementById('dropSub').style.display = 'none';
+  const fn = document.getElementById('fileName');
+  fn.textContent = file.name;
+  fn.style.display = 'block';
+  document.getElementById('dropZone').classList.add('has-file');
+  document.getElementById('extractBtn').disabled = false;
+}
+
+// ─── Mode toggle ─────────────────────────────────────────────────────────────
+function setMode(mode) {
+  document.getElementById('modeAI').classList.toggle('active', mode === 'ai');
+  document.getElementById('modeManual').classList.toggle('active', mode === 'manual');
+  document.getElementById('aiMode').style.display = mode === 'ai' ? 'block' : 'none';
+  document.getElementById('manualMode').style.display = mode === 'manual' ? 'block' : 'none';
+  if (mode === 'manual' && !document.getElementById('manualForm').innerHTML) {
+    renderForm('manualForm', {});
+  }
+}
+
+function renderForm(containerId, defaults) {
+  document.getElementById(containerId).innerHTML =
+    `<div class="form-grid">` +
+    FIELDS.map(f => `
+      <div class="form-group${f.key === 'seller_notes' ? ' full' : ''}">
+        <label>${f.label}${f.required ? ' *' : ''}</label>
+        <input type="${f.type}" id="f_${f.key}"
+          placeholder="${f.placeholder}"
+          value="${defaults[f.key] != null ? defaults[f.key] : ''}">
+      </div>`).join('') +
+    `</div>`;
+}
+
+function readForm() {
+  const data = {};
+  FIELDS.forEach(f => {
+    const el = document.getElementById('f_' + f.key);
+    if (!el) return;
+    const val = el.value.trim();
+    data[f.key] = f.type === 'number' ? (val ? parseFloat(val.replace(/,/g,'')) : null) : (val || null);
+  });
+  return data;
+}
+
+// ─── AI Extraction ────────────────────────────────────────────────────────────
+async function extractWithAI() {
+  if (!pdfFile) { showError('aiError', 'Please upload a PDF first.'); return; }
+  hideError('aiError');
+  setLoading(true);
+
+  try {
+    const fd = new FormData();
+    fd.append('pdf', pdfFile);
+
+    const res = await fetch('/api/extract', { method: 'POST', body: fd });
+    const json = await res.json();
+
+    if (!res.ok || !json.ok) {
+      throw new Error(json.error || json.detail || `Server error ${res.status}`);
+    }
+
+    setLoading(false);
+    goToStep2(json.data);
+  } catch (err) {
+    setLoading(false);
+    showError('aiError', 'Extraction failed: ' + err.message);
+  }
+}
+
+function setLoading(on) {
+  document.getElementById('extractBtn').disabled = on;
+  document.getElementById('extractBtnText').textContent = on ? 'Analyzing…' : 'Analyze with AI';
+  document.getElementById('extractSpinner').style.display = on ? 'inline-block' : 'none';
+}
+
+// ─── Navigation ───────────────────────────────────────────────────────────────
+function goToStep1() {
+  show('step1'); hide('step2'); hide('step3'); hide('stepLoading');
+  setStep(1);
+}
+
+function goToStep2(data) {
+  hide('step1'); show('step2'); hide('step3'); hide('stepLoading');
+  renderForm('reviewForm', data);
+  setStep(2);
+}
+
+function runScoring() {
+  const data = readForm();
+  if (!data.property_name || !data.asking_price || !data.total_units) {
+    const errId = document.getElementById('step2').style.display !== 'none' ? 'reviewError' : null;
+    const msg = 'Please fill in Property Name, Asking Price, and Total Units at minimum.';
+    if (errId) showError(errId, msg); else alert(msg);
+    return;
+  }
+  hide('step1'); hide('step2'); show('stepLoading'); hide('step3');
+  setStep(3);
+  document.getElementById('resetBtn').style.display = 'inline-flex';
+  setTimeout(() => {
+    hide('stepLoading');
+    show('step3');
+    renderResults(scoreDeal(data), data);
+  }, 700);
+}
+
+// ─── Scoring Engine ───────────────────────────────────────────────────────────
+function scoreDeal(d) {
+  const scores = {}, flags = [];
+  let total = 0;
+
+  // 1. Price per door (25 pts)
+  const ppd = (d.asking_price && d.total_units) ? d.asking_price / d.total_units : null;
+  let s = 0;
+  if (ppd !== null) {
+    if      (ppd <= 200000) s = 25;
+    else if (ppd <= 250000) s = 20;
+    else if (ppd <= 300000) s = 13;
+    else if (ppd <= 350000) s = 6;
+    else if (ppd <= 400000) s = 2;
+
+    if      (ppd > 350000) flags.push({ l:'red',    t:`Price/door is $${fmt(ppd)} — above $350K basis. Thesis likely breaks unless comp basis is materially higher than $900/SF.` });
+    else if (ppd > 280000) flags.push({ l:'yellow', t:`Price/door is $${fmt(ppd)} — slightly above 420 Clinton's $255K benchmark. Stress-test insider pricing.` });
+    else                   flags.push({ l:'green',  t:`Price/door at $${fmt(ppd)} is attractive — solid entry vs. the $255K/door benchmark.` });
+  } else {
+    flags.push({ l:'yellow', t:'Cannot determine price/door — verify asking price and unit count.' });
+  }
+  scores.ppd = { score: s, max: 25, label: 'Price / Door', detail: ppd ? '$' + fmt(ppd) + '/door' : 'N/A' };
+  total += s; s = 0;
+
+  // 2. FM / RS mix (20 pts)
+  const tu = d.total_units || null;
+  const fmPct = (d.free_market_units && tu) ? d.free_market_units / tu : null;
+  if (fmPct !== null) {
+    if      (fmPct >= 0.50) s = 20;
+    else if (fmPct >= 0.40) s = 16;
+    else if (fmPct >= 0.30) s = 10;
+    else if (fmPct >= 0.20) s = 5;
+    else                    s = 1;
+
+    const p = Math.round(fmPct * 100) + '%';
+    if      (fmPct < 0.30) flags.push({ l:'red',    t:`Only ${p} FM units (${d.free_market_units}/${tu}). Heavy RS mix raises subsidy cost and conversion risk.` });
+    else if (fmPct < 0.45) flags.push({ l:'yellow', t:`${p} FM (${d.free_market_units}/${tu}). Manageable — verify RS tenant qualification rates.` });
+    else                   flags.push({ l:'green',  t:`Strong FM mix at ${p} (${d.free_market_units}/${tu}) — lower subsidy burden and faster conversion path.` });
+  } else if (d.free_market_units || d.rent_stab_units) {
+    flags.push({ l:'yellow', t:'Partial unit mix data — confirm full FM vs RS breakdown before LOI.' });
+    s = 5;
+  } else {
+    flags.push({ l:'yellow', t:'No FM/RS breakdown found. This is critical — get the rent roll.' });
+    s = 0;
+  }
+  scores.mix = { score: s, max: 20, label: 'FM / RS Mix', detail: fmPct ? Math.round(fmPct*100)+'% FM' : 'Unknown' };
+  total += s; s = 0;
+
+  // 3. Rent-to-market spread (20 pts)
+  const rsRent = d.avg_rs_rent || d.avg_rent;
+  const mktRent = d.avg_market_rent;
+  let spreadDetail = 'N/A';
+  if (rsRent && mktRent && mktRent > rsRent) {
+    const spread = (mktRent - rsRent) / mktRent;
+    spreadDetail = Math.round(spread * 100) + '% below market';
+    if      (spread >= 0.50) s = 20;
+    else if (spread >= 0.35) s = 15;
+    else if (spread >= 0.20) s = 8;
+    else                     s = 2;
+
+    if      (spread >= 0.40) flags.push({ l:'green',  t:`RS rents are ${Math.round(spread*100)}% below market — strong rent-vs-own delta makes conversion compelling for tenants.` });
+    else if (spread >= 0.25) flags.push({ l:'yellow', t:`RS rents are ${Math.round(spread*100)}% below market. Moderate — model affordability closely per unit.` });
+    else                     flags.push({ l:'red',    t:`RS rents only ${Math.round(spread*100)}% below market. Weak spread undermines the conversion case.` });
+  } else {
+    flags.push({ l:'yellow', t:'No market rent data in OM — pull neighborhood comps to validate conversion economics before LOI.' });
+    s = 4;
+    spreadDetail = 'Needs comps';
+  }
+  scores.spread = { score: s, max: 20, label: 'Rent–Market Spread', detail: spreadDetail };
+  total += s; s = 0;
+
+  // 4. Avg unit size (15 pts)
+  if (d.avg_sf) {
+    if      (d.avg_sf >= 1000) s = 15;
+    else if (d.avg_sf >= 850)  s = 11;
+    else if (d.avg_sf >= 700)  s = 6;
+    else                       s = 2;
+
+    const iv = '$' + fmt(d.avg_sf * 900);
+    if      (d.avg_sf >= 950) flags.push({ l:'green',  t:`Avg ${d.avg_sf} SF/unit implies ~${iv} market value at $900/SF — good insider discount headroom.` });
+    else if (d.avg_sf < 700)  flags.push({ l:'red',    t:`Small units avg ${d.avg_sf} SF. Condo pricing per SF works less well under 700 SF — validate comp basis.` });
+    else                      flags.push({ l:'yellow', t:`Avg ${d.avg_sf} SF/unit — confirm $900/SF comp support at this size.` });
+  } else {
+    flags.push({ l:'yellow', t:'No avg unit SF in OM. Get the rent roll — unit size directly drives your $/SF comp analysis.' });
+    s = 4;
+  }
+  scores.size = { score: s, max: 15, label: 'Avg Unit Size', detail: d.avg_sf ? d.avg_sf + ' SF' : 'Unknown' };
+  total += s; s = 0;
+
+  // 5. Deal structure fit (20 pts)
+  // Unit count (8 pts) — ideal 20–80 for non-eviction plan
+  let us = 0;
+  if (tu) {
+    if      (tu >= 20 && tu <= 80)   us = 8;
+    else if (tu >= 15 || tu <= 120)  us = 5;
+    else                             us = 2;
+    if (tu < 15) flags.push({ l:'red',    t:`${tu} units may be too small for a non-eviction plan — verify filing economics with conversion counsel.` });
+    else if (tu > 100) flags.push({ l:'yellow', t:`${tu} units: 51% threshold is ${Math.ceil(tu*0.51)} conversions. Plan timeline and financing accordingly.` });
+  }
+  // Submarket (7 pts)
+  let ss = 0;
+  const goodMkts = ['brooklyn','manhattan','clinton hill','prospect heights','crown heights','bedford-stuyvesant','bed-stuy','fort greene','cobble hill','carroll gardens','boerum hill','park slope','harlem','washington heights','west village','east village','upper west','upper east','astoria','long island city','hoboken','jersey city','williamsburg','greenpoint','bushwick','flatbush','ditmas'];
+  const loc = ((d.submarket||'') + ' ' + (d.property_name||'')).toLowerCase();
+  if (goodMkts.some(m => loc.includes(m))) {
+    ss = 7;
+    flags.push({ l:'green', t:`Submarket aligns with FM Capital target markets — $900/SF comp basis should be supportable.` });
+  } else if (/bronx|staten island/.test(loc)) {
+    ss = 2;
+    flags.push({ l:'yellow', t:`Submarket may be outside core condo comp territory — validate $900/SF basis with local comparables.` });
+  } else {
+    ss = 3;
+    flags.push({ l:'yellow', t:`Verify $900/SF condo comp basis for this submarket — it's the load-bearing assumption for insider pricing.` });
+  }
+  // Building age (5 pts)
+  const as_ = d.year_built ? (d.year_built < 1940 ? 5 : d.year_built < 1970 ? 3 : 2) : 3;
+
+  s = us + ss + as_;
+  scores.struct = { score: s, max: 20, label: 'Deal Structure Fit', detail: tu ? tu + ' units' : 'Unknown' };
+  total += s;
+
+  // Verdict
+  const verdict = total >= 68 ? { label:'✓ PURSUE',      sub:'Meets FM Capital thesis — advance to diligence',       cls:'pursue'      }
+                : total >= 45 ? { label:'⚠ CONDITIONAL', sub:'Potential fit — address flagged issues before LOI',      cls:'conditional' }
+                :               { label:'✕ PASS',         sub:'Does not meet acquisition criteria',                    cls:'pass'        };
+
+  return { total, scores, flags, verdict, ppd, fmPct };
+}
+
+// ─── Render Results ────────────────────────────────────────────────────────────
+function renderResults(r, d) {
+  const color = r.total >= 68 ? '#166534' : r.total >= 45 ? '#b45309' : '#991b1b';
+  const ringBg = r.total >= 68 ? '#dcfce7' : r.total >= 45 ? '#fef3c7' : '#fee2e2';
+  const ppd = r.ppd ? '$' + fmt(r.ppd) : 'N/A';
+  const fmStr = r.fmPct != null ? Math.round(r.fmPct*100)+'%' : 'N/A';
+  const impliedVal = d.avg_sf ? '$' + fmt(d.avg_sf * 900) : 'N/A';
+
+  document.getElementById('step3').innerHTML = `
+    <div class="card">
+      <div class="score-hero">
+        <div class="score-ring-wrap">
+          <canvas id="scoreRing" width="150" height="150"></canvas>
+          <div class="score-inner">
+            <div class="score-num" style="color:${color}">${r.total}</div>
+            <div class="score-denom">/ 100</div>
+          </div>
+        </div>
+        <div class="verdict-badge ${r.verdict.cls}">${r.verdict.label}</div>
+        <div class="verdict-label">${r.verdict.sub}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:18px;font-weight:800;margin-bottom:3px">${d.property_name || 'Property'}</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:18px">${d.submarket || ''}</div>
+      <div class="summary-grid">
+        <div class="summary-cell"><div class="s-label">Asking Price</div><div class="s-value">${d.asking_price ? '$'+fmtM(d.asking_price) : 'N/A'}</div></div>
+        <div class="summary-cell"><div class="s-label">Price / Door</div><div class="s-value">${ppd}</div></div>
+        <div class="summary-cell"><div class="s-label">Total Units</div><div class="s-value">${d.total_units || 'N/A'}</div></div>
+        <div class="summary-cell"><div class="s-label">FM Units</div><div class="s-value sm">${d.free_market_units != null ? d.free_market_units+' ('+fmStr+')' : 'N/A'}</div></div>
+        <div class="summary-cell"><div class="s-label">RS Units</div><div class="s-value sm">${d.rent_stab_units != null ? d.rent_stab_units : 'N/A'}</div></div>
+        <div class="summary-cell"><div class="s-label">Avg Unit SF</div><div class="s-value sm">${d.avg_sf ? d.avg_sf+' SF' : 'N/A'}</div></div>
+        <div class="summary-cell"><div class="s-label">Avg Rent</div><div class="s-value sm">${d.avg_rent ? '$'+fmt(d.avg_rent)+'/mo' : 'N/A'}</div></div>
+        <div class="summary-cell"><div class="s-label">Market Rent</div><div class="s-value sm">${d.avg_market_rent ? '$'+fmt(d.avg_market_rent)+'/mo' : 'N/A'}</div></div>
+        <div class="summary-cell"><div class="s-label">Implied Condo Value</div><div class="s-value sm">${impliedVal}${d.avg_sf ? '/unit' : ''}</div></div>
+      </div>
+      ${d.seller_notes ? `<div class="notes-box"><strong>OM Notes:</strong> ${d.seller_notes}</div>` : ''}
+    </div>
+
+    <div class="card">
+      <div class="section-label">Score Breakdown</div>
+      <div class="breakdown">
+        ${Object.values(r.scores).map(s => {
+          const pct = s.score / s.max * 100;
+          const fc = pct >= 70 ? 'fill-green' : pct >= 40 ? 'fill-yellow' : 'fill-red';
+          return `<div class="breakdown-item">
+            <div class="cat">${s.label}</div>
+            <div class="pts">${s.score} <span>/ ${s.max} pts</span></div>
+            <div class="detail">${s.detail}</div>
+            <div class="progress-bar"><div class="progress-fill ${fc}" style="width:${pct}%"></div></div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-label">Deal Flags</div>
+      <div class="flags-list">
+        ${r.flags.map(f => `
+          <div class="flag ${f.l}">
+            <div class="flag-icon">${f.l==='red'?'🔴':f.l==='yellow'?'🟡':'🟢'}</div>
+            <div>${f.t}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="center">
+      <button class="btn btn-ghost" onclick="resetApp()">+ Screen Another Deal</button>
+    </div>`;
+
+  requestAnimationFrame(() => {
+    const canvas = document.getElementById('scoreRing');
+    if (!canvas) return;
+    new Chart(canvas.getContext('2d'), {
+      type: 'doughnut',
+      data: { datasets: [{ data: [r.total, 100-r.total], backgroundColor: [color, ringBg], borderWidth: 0 }] },
+      options: { cutout:'72%', animation:{ duration:900, easing:'easeInOutQuart' }, plugins:{ legend:{ display:false }, tooltip:{ enabled:false } }, responsive:false }
+    });
+  });
+}
+
+// ─── Reset ────────────────────────────────────────────────────────────────────
+function resetApp() {
+  pdfFile = null;
+  show('step1'); hide('step2'); hide('step3'); hide('stepLoading');
+  document.getElementById('step3').innerHTML = '';
+  document.getElementById('manualForm').innerHTML = '';
+  document.getElementById('reviewForm').innerHTML = '';
+  document.getElementById('resetBtn').style.display = 'none';
+  document.getElementById('extractBtn').disabled = true;
+  document.getElementById('dropIcon').textContent = '📄';
+  document.getElementById('dropTitle').textContent = 'Drop the OM here, or click to browse';
+  document.getElementById('dropSub').style.display = '';
+  document.getElementById('fileName').style.display = 'none';
+  document.getElementById('dropZone').classList.remove('has-file');
+  document.getElementById('pdfInput').value = '';
+  hideError('aiError');
+  setMode('ai');
+  setStep(1);
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function show(id) { document.getElementById(id).style.display = 'block'; }
+function hide(id) { document.getElementById(id).style.display = 'none'; }
+function showError(id, msg) { const el = document.getElementById(id); if (el) { el.textContent = msg; el.style.display = 'block'; } }
+function hideError(id) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
+function setStep(n) {
+  [1,2,3].forEach(i => {
+    const el = document.getElementById('s'+i);
+    el.classList.remove('active','done');
+    if (i < n) { el.classList.add('done'); el.querySelector('.step-num').textContent = '✓'; }
+    else if (i === n) el.classList.add('active');
+    else el.querySelector('.step-num').textContent = i;
+  });
+}
+function fmt(n) { return n == null ? 'N/A' : Math.round(n).toLocaleString(); }
+function fmtM(n) { return n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(0)+'K' : String(n); }
+</script>
+</body>
+</html>
